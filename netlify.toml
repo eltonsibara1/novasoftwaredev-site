@@ -8,3 +8,10 @@
   [headers.values]
     Cache-Control = "no-cache"
     Access-Control-Allow-Origin = "*"
+
+# novasoftwaredev.netlify.app/edit opens the site in edit mode (easier to type on a phone than #edit)
+[[redirects]]
+  from = "/edit"
+  to = "/?edit"
+  status = 302
+  force = true
