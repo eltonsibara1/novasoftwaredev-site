@@ -681,11 +681,16 @@ async function save(){
 }
 render();
 if(location.hash){setTimeout(function(){var t=document.getElementById(location.hash.slice(1));if(t)t.scrollIntoView()},50)}
-if(!(window.claude&&claude.use)&&/(^|[?&#])edit($|[&=#])/.test(location.search+location.hash)){
+function wantEdit(){return /(^|[?&#])edit($|[&=#])/.test(location.search+location.hash)}
+function startLocalEdit(){
   /* editing on Netlify: open the site with #edit at the end of its address */
-  api.canEdit=true;api.local=true;
+  if(api.local)return;api.canEdit=true;api.local=true;
   try{var dl=sessionStorage.getItem('draft');if(dl){S=JSON.parse(dl);dirty=true;editing=true}}catch(e){}
-  render();
+  render();toast('Edit mode: press “✎ Edit site” at the bottom of the screen.');
+}
+if(!(window.claude&&claude.use)){
+  if(wantEdit())startLocalEdit();
+  window.addEventListener('hashchange',function(){if(wantEdit())startLocalEdit()});   /* #edit typed on an open page */
 }
 if(window.claude&&claude.use){
   claude.use('user').then(function(u){return u?u.canEdit():false}).then(function(ok){
