@@ -1,9 +1,11 @@
-# novasoftwaredev.netlify.app
+# novasoftwaredev.co.za
 
 Elton Sibara's website (Nova Software Dev) and the home of Nestify.
 
-- `index.html` - the whole site. Edit it on the site itself: open `https://novasoftwaredev.netlify.app/#edit`,
-  press **Edit site**, then **Publish changes** (saves here; Netlify puts it live in about a minute).
+- `index.html` - the whole site. Edit it on the site itself: open `https://novasoftwaredev.co.za/edit`,
+  press **Edit site**, then **Publish changes** (saves here; GitHub Pages puts it live in about a minute).
 - `Nestify_User_Guide.pdf` - the guide behind "Download PDF".
 - `nestify-version.json` - Nestify's update check reads this. Raise `version` when a new Nestify is out.
-- `netlify.toml` - tells Netlify there is nothing to build.
+- `CNAME` - the site's own domain for GitHub Pages.
+- `edit/index.html` - makes novasoftwaredev.co.za/edit open the editor.
+- `netlify.toml` - only used while the site was on Netlify.
