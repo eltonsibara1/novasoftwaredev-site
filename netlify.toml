@@ -1,0 +1,10 @@
+# Netlify: the site is plain files at the top of this repository, nothing to build.
+[build]
+  publish = "."
+  command = ""
+
+[[headers]]
+  for = "/nestify-version.json"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Access-Control-Allow-Origin = "*"
