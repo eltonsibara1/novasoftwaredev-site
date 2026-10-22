@@ -418,7 +418,7 @@ var SCHEMA={
  comment:[{key:'name',label:'Name'},{key:'text',label:'Comment',type:'textarea'},{key:'date',label:'Date',type:'date'}],
  media:[{key:'title',label:'Title'},{key:'caption',label:'Short description',type:'textarea'}],
  software:[{key:'name',label:'Name',required:true},{key:'icon',label:'App icon (square, like on Google Play: 512 × 512)',type:'image',size:'icon'},{key:'shot',label:'Feature graphic (the wide picture behind the app’s card and page: 1024 × 500)',type:'image',size:'graphic'},{key:'screenshots',label:'Screenshots (pick several at once)',type:'images',hint:'They show in a row on the app’s page and under Pictures & videos. Edit or delete them there.'},{key:'status',label:'Status',hint:'e.g. Beta · testers wanted'},{key:'tagline',label:'One-line description'},{key:'description',label:'About the app (a few short paragraphs)',type:'textarea',hint:'Leave an empty line between paragraphs.'},{key:'features',label:'Features (one per line)',type:'lines'},{key:'platform',label:'Runs on',hint:'e.g. Windows 10 / 11'},{key:'version',label:'Version'},{key:'price',label:'Price'},{key:'priceNote',label:'Price note'},{key:'cta',label:'Main button text',hint:'e.g. Become a tester'},{key:'download',label:'Download link (optional)',type:'url',hint:'When filled in, the main button downloads the app.'},{key:'meta',label:'Small print'}],
- profile:[{key:'photo',label:'Your photo',type:'image'},{key:'name',label:'Full name'},{key:'hello',label:'Greeting above your name'},{key:'roles',label:'Roles that type themselves (one per line)',type:'lines'},{key:'about',label:'Short intro (top of page)',type:'textarea'},{key:'aboutLong',label:'About me (longer)',type:'textarea'},{key:'startYear',label:'Year you started programming',type:'number'},{key:'available',label:'Badge on your photo',hint:'e.g. Available for projects'},{key:'email',label:'Email',type:'email'},{key:'phone',label:'Phone / WhatsApp (optional)'},{key:'location',label:'Location (optional)'},{key:'contactNote',label:'Contact text',type:'textarea'},{key:'siteUrl',label:'This website’s link',type:'url',hint:'Used by the Share buttons. Paste the link you share with people.'},{key:'cfToken',label:'Visitor counter (Cloudflare Web Analytics token)',hint:'Paste the token, or the whole code Cloudflare gives you. Leave empty to turn the counter off.'}]
+ profile:[{key:'photo',label:'Your photo',type:'image'},{key:'name',label:'Full name'},{key:'hello',label:'Greeting above your name'},{key:'roles',label:'Roles that type themselves (one per line)',type:'lines'},{key:'about',label:'Short intro (top of page)',type:'textarea'},{key:'aboutLong',label:'About me (longer)',type:'textarea'},{key:'startYear',label:'Year you started programming',type:'number'},{key:'available',label:'Badge on your photo',hint:'e.g. Available for projects'},{key:'email',label:'Email',type:'email'},{key:'phone',label:'Phone / WhatsApp (optional)'},{key:'location',label:'Location (optional)'},{key:'contactNote',label:'Contact text',type:'textarea'},{key:'siteUrl',label:'This website’s link',type:'url',hint:'Used by the Share buttons. Paste the link you share with people.'},{key:'cfToken',label:'Visitor counter (Cloudflare Web Analytics token)',hint:'Paste the token, or the whole code Cloudflare gives you. Leave empty to turn the counter off.'},{key:'counterUrl',label:'Your own visitor counter (Worker link)',type:'url',hint:'The link of your Cloudflare Worker, like https://visitor-counter.yourname.workers.dev. The 📊 Visitors button shows its numbers.'},{key:'publicCount',label:'Show the number of visitors to everyone? (yes / no)',hint:'Type yes to show it at the bottom of the page.'}]
 };
 
 /* ---------- each app keeps its own pictures, videos and user guide ---------- */
@@ -454,7 +454,7 @@ function render(){
   var main=h('main',{id:'main-view'});app.appendChild(main);
   if(p){document.title=p.name+' · '+P.name;appPage(main,p,r.tab)}
   else{document.title=P.name;homePage(main)}
-  app.appendChild(h('footer',{},[h('div',{class:'wrap'},[h('span',{text:'© '+new Date().getFullYear()+' '+P.name+' · Nova Software Dev'}),h('span',{},S.software.map(function(a){return h('a',{href:'#app/'+a.id,text:a.name,style:'margin-left:14px'})}).concat([h('a',{href:'#contact',text:'Contact',style:'margin-left:14px',onclick:function(e){if(route().app){e.preventDefault();homeThen('#contact')}}})]))])]));
+  app.appendChild(h('footer',{},[h('div',{class:'wrap'},[h('span',{},[h('span',{text:'© '+new Date().getFullYear()+' '+P.name+' · Nova Software Dev'}),h('span',{id:'vcount',text:vcShown||''})]),h('span',{},S.software.map(function(a){return h('a',{href:'#app/'+a.id,text:a.name,style:'margin-left:14px'})}).concat([h('a',{href:'#contact',text:'Contact',style:'margin-left:14px',onclick:function(e){if(route().app){e.preventDefault();homeThen('#contact')}}})]))])]));
   app.appendChild(h('div',{class:'overlay',id:'ov',onclick:function(e){if(e.target.id==='ov')closeOv()}}));
   app.appendChild(h('div',{class:'toast',id:'toast'}));
   app.appendChild(editBar());
@@ -734,6 +734,7 @@ try{var th=localStorage.getItem('theme');if(th)document.documentElement.dataset.
 function editBar(){
   var bar=h('div',{class:'editbar'+(api.canEdit?' show':'')});
   if(!editing)bar.appendChild(h('button',{class:'btn primary',onclick:function(){editing=true;render()},text:'✎ Edit site'}));
+  if(vcUrl())bar.appendChild(h('button',{class:'btn',onclick:visitorsPanel,text:'📊 Visitors'}));
   else{bar.appendChild(h('span',{class:'note',text:dirty?(api.local?'Changes are only in this browser until you publish':'Unsaved changes'):(api.local?(ghConf()?'Editing — Publish changes puts it live':'Editing — Publish changes downloads the new page for Netlify'):'Editing — visitors don’t see these buttons')}));
     bar.appendChild(h('button',{class:'btn',onclick:function(){if(dirty&&!window.confirm('Throw away your changes?'))return;try{sessionStorage.removeItem('draft')}catch(e){}location.reload()},text:dirty?'Discard':'Done'}));
     if(api.local)bar.appendChild(h('button',{class:'btn',onclick:phoneSetup,text:ghConf()?'⚙ Publishing':'Set up phone publishing'}));
@@ -966,5 +967,50 @@ if(window.claude&&claude.use){
   if(!t||!/^[A-Za-z0-9_-]{8,}$/.test(t)||location.protocol==='file:'||/edit/.test(location.hash)||(window.claude&&claude.use))return;
   var b=document.createElement('script');b.type='module';b.defer=true;b.src='https://static.cloudflareinsights.com/beacon.min.js';
   b.setAttribute('data-cf-beacon',JSON.stringify({token:t}));document.head.appendChild(b)}catch(e){}})();
+/* ---------- your own visitor counter (a free Cloudflare Worker; no cookies) ---------- */
+function vcUrl(){var u=String((S.profile||{}).counterUrl||'').trim().replace(/\/+$/,'');return /^https:\/\//.test(u)?u:''}
+var vcShown='';
+function vcPath(){var hs=location.hash||'';return '/'+(/^#app\//.test(hs)?hs.split('/').slice(0,3).join('/'):'')}
+var vcLast='';
+function vcHit(){var u=vcUrl();if(!u||editing||/edit/.test(location.hash)||(window.claude&&claude.use)||location.protocol==='file:')return;
+  var p=vcPath();if(p===vcLast)return;vcLast=p;
+  try{fetch(u+'/hit',{method:'POST',keepalive:true,headers:{'Content-Type':'text/plain'},body:JSON.stringify({path:p,ref:document.referrer||''})}).catch(function(){})}catch(e){}}
+function vcPublic(){var u=vcUrl();if(!u||!/^y/i.test(String((S.profile||{}).publicCount||'')))return;
+  fetch(u+'/count').then(function(r){return r.json()}).then(function(d){if(!d||!d.visitors)return;
+    vcShown=' · '+Number(d.visitors).toLocaleString()+' visitors';var el=$('#vcount');if(el)el.textContent=vcShown}).catch(function(){})}
+function visitorsPanel(){
+  var ov=$('#ov');ov.innerHTML='';var key='';try{key=localStorage.getItem('vc_key')||''}catch(e){}
+  var body=h('div',{},[h('p',{class:'hint',text:'Loading…'})]);
+  var panel=h('div',{class:'panel',style:'width:min(720px,100%)'},[h('div',{style:'display:flex;align-items:center;gap:10px;margin-bottom:8px'},[h('h3',{style:'margin:0;margin-right:auto',text:'Visitors'}),
+    h('button',{class:'btn',onclick:closeOv,text:'Close'})]),body]);
+  ov.appendChild(panel);ov.classList.add('open');
+  function ask(msg){body.innerHTML='';var inp=h('input',{type:'password',placeholder:'your counter password (OWNER_KEY)',autocomplete:'off'});
+    body.appendChild(h('form',{onsubmit:function(e){e.preventDefault();key=inp.value.trim();try{localStorage.setItem('vc_key',key)}catch(x){}load()}},[
+      h('p',{class:'hint',text:msg||'Type the password you gave the counter (OWNER_KEY in Cloudflare). It is kept only on this device.'}),
+      h('div',{class:'field'},[inp]),h('button',{class:'btn primary',type:'submit',text:'Show the numbers'})]));inp.focus()}
+  function card(t,v,sub){return h('div',{style:'flex:1;min-width:120px;border:1px solid var(--line);border-radius:14px;padding:12px'},[
+    h('div',{class:'hint',text:t}),h('div',{style:'font-size:26px;font-weight:700',text:String(v&&v.visitors||0)}),h('div',{class:'hint',text:(v&&v.views||0)+' page views'})])}
+  function list(t,rows,fmt){return h('div',{style:'flex:1;min-width:200px'},[h('h4',{style:'margin:14px 0 6px',text:t})].concat(
+    (rows&&rows.length?rows:[{name:'—',n:''}]).map(function(r){return h('div',{style:'display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:5px 0;font-size:14px'},
+      [h('span',{text:fmt?fmt(r.name):(r.name||'(unknown)')}),h('span',{class:'hint',text:String(r.n)})])})))}
+  function chart(days){var by={};days.forEach(function(d){by[d.day]=d});days=[];
+    for(var i=29;i>=0;i--){var dd=new Date(Date.now()-i*864e5).toISOString().slice(0,10);days.push(by[dd]||{day:dd,visitors:0,views:0})}
+    var mx=Math.max.apply(null,[1].concat(days.map(function(d){return d.visitors})));
+    return h('div',{style:'display:flex;align-items:flex-end;gap:3px;height:90px;margin:14px 0 4px'},days.map(function(d){
+      return h('div',{title:d.day+': '+d.visitors+' visitors, '+d.views+' views',style:'flex:1;background:var(--accent,#ff8c38);border-radius:3px 3px 0 0;min-height:2px;height:'+Math.round(d.visitors/mx*100)+'%'})}))}
+  function load(){if(!key)return ask();body.innerHTML='';body.appendChild(h('p',{class:'hint',text:'Loading…'}));
+    fetch(vcUrl()+'/stats?key='+encodeURIComponent(key)).then(function(r){return r.json().then(function(d){return [r.status,d]})}).then(function(x){
+      var st=x[0],d=x[1];if(st===403)return ask('That password is not right. Type the OWNER_KEY you set in Cloudflare.');
+      if(d.error)throw new Error(d.error);body.innerHTML='';
+      body.appendChild(h('div',{style:'display:flex;gap:10px;flex-wrap:wrap'},[card('Today',d.today),card('Last 7 days',d.week),card('Last 30 days',d.month),card('All time',d.total)]));
+      body.appendChild(h('div',{class:'hint',style:'margin-top:10px',text:'Visitors per day, last 30 days'}));body.appendChild(chart(d.days||[]));
+      body.appendChild(h('div',{style:'display:flex;gap:18px;flex-wrap:wrap'},[
+        list('Pages opened',d.pages,function(n){var a=/#app\/(.+)/.exec(n||'');if(!a)return 'Home';var s=(S.software||[]).filter(function(x){return x.id===a[1].split('/')[0]})[0];return (s?s.name:a[1])+' page'}),
+        list('Countries',d.countries,function(c){try{return c?new Intl.DisplayNames(['en'],{type:'region'}).of(c):'(unknown)'}catch(e){return c||'(unknown)'}}),list('Devices',d.devices),list('Came from',d.from)]));
+      body.appendChild(h('p',{class:'hint',style:'margin-top:12px',text:'A visitor is counted once a day. No cookies are used and no one is tracked.'}));
+    }).catch(function(e){body.innerHTML='';body.appendChild(h('p',{class:'hint',text:'Could not reach the counter: '+(e.message||e)}))})}
+  load();
+}
+vcHit();vcPublic();window.addEventListener('hashchange',vcHit);
 })();
 </script></body></html>
