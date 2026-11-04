@@ -1,10 +1,18 @@
-// Visitor counter + ratings and feedback for Nova Software Dev (novasoftwaredev) and Sibara Electrical (sibara).
-// A free Cloudflare Worker with a D1 database. Version 2.
+// Visitor counter, ratings and feedback, and app downloads for Nova Software Dev (nova) and Sibara Electrical
+// (sibara). A free Cloudflare Worker with a D1 database. Version 3.
 //
 // Bindings (Worker > Settings > Bindings / Variables and Secrets):
 //   DB          D1 database (any name)
 //   OWNER_KEY   secret: your password; shows the numbers of every site and lets you remove reviews
 //   SIBARA_KEY  secret (optional): a password for the Sibara site only, to give to its owner
+//   GITHUB_TOKEN secret (optional): a GitHub fine-grained token with read-only "Contents" access to the
+//               repositories that hold your installers. With it, installers in PRIVATE repositories can be
+//               downloaded from the website (the code stays private). Public repositories work without it.
+//
+// Downloads: put the installer (.exe, .msi, .zip, .apk ...) on a GitHub Release of the app's repository.
+// The website asks /release?repo=owner/name (is there a file? which version? how many downloads?) and its
+// Download button goes to /download?repo=owner/name, which counts the download and hands over the file.
+// Only repositories of GITHUB_OWNER (default eltonsibara1) are served.
 //
 // No cookies and no IP addresses are kept: a visitor is a one-way code that changes every day.
 // Each site's numbers and reviews are kept apart by the "site" name the page sends.
@@ -15,7 +23,9 @@ const SITES = {
   sibara: ["https://sibaraelectric.com", "https://www.sibaraelectric.com", "https://eltonsibara1.github.io"],
 };
 const ALL = [...new Set(Object.values(SITES).flat())];
-const VERSION = 2;
+const VERSION = 3;
+const GITHUB_OWNER_DEFAULT = "eltonsibara1";
+const KINDS = [".exe", ".msi", ".msix", ".zip", ".apk", ".aab", ".dmg", ".appimage", ".deb", ".7z"];
 
 function cors(req) {
   const o = req.headers.get("Origin") || "";
@@ -45,6 +55,9 @@ async function setup(db) {
   await db.exec("CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, site TEXT, target TEXT, " +
                 "stars INTEGER, name TEXT, role TEXT, text TEXT, day TEXT, vid TEXT, hidden INTEGER DEFAULT 0)");
   await db.exec("CREATE INDEX IF NOT EXISTS reviews_site ON reviews(site)");
+  await db.exec("CREATE TABLE IF NOT EXISTS downloads (day TEXT, site TEXT, repo TEXT, version TEXT, file TEXT, " +
+                "country TEXT, vid TEXT)");
+  await db.exec("CREATE INDEX IF NOT EXISTS downloads_repo ON downloads(repo)");
 }
 
 async function sha(text) {
@@ -122,6 +135,8 @@ async function stats(req, env, url) {
                         " AND day >= ? GROUP BY device ORDER BY n DESC", site, d30),
     from: await rows(env, "SELECT ref AS name, COUNT(*) AS n FROM views WHERE " + S +
                      " AND day >= ? AND ref != '' GROUP BY ref ORDER BY n DESC LIMIT 10", site, d30),
+    downloads: await rows(env, "SELECT repo AS name, COUNT(DISTINCT day || vid) AS n FROM downloads WHERE site = ? " +
+                          "GROUP BY repo ORDER BY n DESC", site),
   });
 }
 
@@ -159,6 +174,87 @@ async function hideReview(req, env) {
   return json(req, { ok: true });
 }
 
+// ------------------------------------------------------------------ downloads from GitHub Releases
+function repoOf(env, v) {
+  const r = String(v || "").trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "");
+  const m = /^([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(r);
+  const owner = String(env.GITHUB_OWNER || GITHUB_OWNER_DEFAULT).toLowerCase();
+  return m && m[1].toLowerCase() === owner ? r : "";
+}
+
+function gh(env, url, accept) {
+  const h = { "User-Agent": "novasoftwaredev-downloads", "Accept": accept || "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28" };
+  if (env.GITHUB_TOKEN) h["Authorization"] = "Bearer " + env.GITHUB_TOKEN;
+  return fetch(url, { headers: h, redirect: "manual" });
+}
+
+// The newest release (pre-releases too, never drafts) that has an installer, cached for 5 minutes.
+async function latest(env, repo) {
+  const cache = caches.default;
+  const key = new Request("https://cache.local/release/" + repo);
+  const hit = await cache.match(key);
+  if (hit) return await hit.json();
+  let out = { available: false };
+  const r = await gh(env, (env.GITHUB_API || "https://api.github.com") + "/repos/" + repo + "/releases?per_page=10");
+  if (r.ok) {
+    const list = await r.json();
+    for (const rel of list) {
+      if (rel.draft) continue;
+      const files = (rel.assets || []).filter((a) => KINDS.some((k) => a.name.toLowerCase().endsWith(k)));
+      files.sort((a, b) => KINDS.findIndex((k) => a.name.toLowerCase().endsWith(k)) -
+                           KINDS.findIndex((k) => b.name.toLowerCase().endsWith(k)));
+      if (files.length) {
+        const f = files[0];
+        out = { available: true, version: (rel.tag_name || rel.name || "").replace(/^v/i, ""), file: f.name,
+                size: f.size, asset: f.url, published: (rel.published_at || "").slice(0, 10),
+                prerelease: !!rel.prerelease };
+        break;
+      }
+    }
+  } else {
+    out.reason = r.status === 404 ? "no repository or no access" : "GitHub said " + r.status;
+  }
+  await cache.put(key, new Response(JSON.stringify(out), { headers: { "Cache-Control": out.available ? "max-age=300" : "max-age=60" } }));
+  return out;
+}
+
+async function downloadsOf(env, repo) {
+  const r = (await rows(env, "SELECT COUNT(DISTINCT day || vid) AS n FROM downloads WHERE repo = ?", repo))[0];
+  return (r && r.n) || 0;
+}
+
+async function release(req, env, url) {
+  const repo = repoOf(env, url.searchParams.get("repo"));
+  if (!repo) return json(req, { available: false, downloads: 0, reason: "not allowed" });
+  const info = await latest(env, repo);
+  const { asset, ...pub } = info;
+  return json(req, { ...pub, downloads: await downloadsOf(env, repo) });
+}
+
+async function download(req, env, url) {
+  const repo = repoOf(env, url.searchParams.get("repo"));
+  const site = siteOf(url.searchParams.get("site"));
+  const back = SITES[site][0];
+  const info = repo ? await latest(env, repo) : { available: false };
+  if (!info.available) {
+    return new Response("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>" +
+      "<title>Coming soon</title><body style='font:18px system-ui;padding:40px;text-align:center'>" +
+      "<h1>Coming soon</h1><p>This download is not ready yet. Please check again later.</p>" +
+      "<p><a href='" + back + "'>Back to the website</a></p>", { status: 404, headers: { "Content-Type": "text/html" } });
+  }
+  const r = await gh(env, info.asset, "application/octet-stream");
+  const to = r.headers.get("Location");
+  if (!to) return json(req, { error: "GitHub did not hand over the file (" + r.status + ")" }, 502);
+  const ua = req.headers.get("User-Agent") || "";
+  if (!/bot|crawl|spider|slurp|preview|headless/i.test(ua)) {
+    const [day, vid] = await visitorId(req, env);
+    await env.DB.prepare("INSERT INTO downloads (day, site, repo, version, file, country, vid) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(day, site, repo, info.version || "", info.file || "", (req.cf && req.cf.country) || "", vid).run();
+  }
+  return Response.redirect(to, 302);
+}
+
 export default {
   async fetch(req, env) {
     if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
@@ -178,6 +274,8 @@ export default {
       if (p === "/reviews" && req.method === "GET") return await listReviews(req, env, url);
       if (p === "/review" && req.method === "POST") return await addReview(req, env);
       if (p === "/review/hide" && req.method === "POST") return await hideReview(req, env);
+      if (p === "/release") return await release(req, env, url);
+      if (p === "/download") return await download(req, env, url);
       return json(req, { ok: true, name: "visitor counter", version: VERSION });
     } catch (e) {
       return json(req, { error: String(e && e.message || e) }, 500);
