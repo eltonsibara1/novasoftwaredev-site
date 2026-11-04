@@ -277,6 +277,29 @@ body.editing .ed{display:flex}
 .starpick{display:flex;gap:4px}
 .starpick button{font-size:30px;line-height:1;border:0;background:none;color:var(--line);cursor:pointer;padding:0 2px}
 .starpick button.on{color:var(--star)}
+/* specials */
+.specials{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+.spec{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.spec .simg{aspect-ratio:16/9;background:var(--bg2);position:relative}
+.spec .simg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.spec .badge{position:absolute;top:12px;left:12px;background:var(--grad);color:#fff;font:700 13px Sora,sans-serif;padding:6px 12px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.spec .sb{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
+.spec h3{font-size:19px;margin:0}
+.spec p{margin:0;color:var(--muted)}
+.spec .pr{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.spec .pr b{font:800 26px Sora,sans-serif}
+.spec .pr s{color:var(--muted);font-size:15px}
+.spec .ends{font:600 12.5px "JetBrains Mono",monospace;color:var(--accent)}
+.spec .sb .actions{margin-top:auto;padding-top:6px}
+/* live ratings */
+.rv .live{font-size:11px;color:var(--muted);margin-left:6px}
+.rate-box .bigavg{display:flex;gap:12px;align-items:center;margin:4px 0 10px}
+.rate-box .bigavg b{font:800 34px Sora,sans-serif;line-height:1}
+.rate-box .mini-rv{border-top:1px solid var(--line);padding:10px 0 0;margin-top:10px;font-size:14px}
+.rate-box .mini-rv p{margin:4px 0 0;color:var(--ink)}
+.appcard .rstars{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);margin-top:4px}
+.appcard .rstars .stars{font-size:14px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 /* contact */
 .contact{display:grid;grid-template-columns:1.2fr 1fr;gap:28px;align-items:center;background:var(--grad);color:#fff;border-radius:28px;padding:clamp(26px,5vw,56px);position:relative;overflow:hidden}
 .contact:after{content:"";position:absolute;width:420px;height:420px;right:-120px;bottom:-200px;border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none}
@@ -415,6 +438,7 @@ var SCHEMA={
  socials:[{key:'kind',label:'Network',type:'select',options:SOCIAL_OPTS},{key:'url',label:'Link (https://…)',type:'url'}],
  reviews:[{key:'name',label:'Name'},{key:'role',label:'Who they are (optional)'},{key:'stars',label:'Stars',type:'select',options:[['5','5'],['4','4'],['3','3'],['2','2'],['1','1']]},{key:'text',label:'Review',type:'textarea'},{key:'date',label:'Date',type:'date'}],
  news:[{key:'title',label:'Headline'},{key:'date',label:'Date',type:'date'},{key:'tag',label:'Label (optional)',hint:'Use the app’s name (for example Nestify) and the post also shows on that app’s page.'},{key:'image',label:'Picture (optional)',type:'image'},{key:'body',label:'Text',type:'textarea',hint:'Leave an empty line between paragraphs.'},{key:'fb',label:'Facebook post link (optional)',type:'url',hint:'If you also posted this on Facebook, people can comment there too.'}],
+ specials:[{key:'title',label:'What is on special'},{key:'price',label:'Special price or deal',hint:'For example R1 200, 20% off or Free for testers'},{key:'was',label:'Normal price (optional, shown crossed out)'},{key:'image',label:'Picture (optional)',type:'image'},{key:'text',label:'What is included',type:'textarea'},{key:'ends',label:'Ends on (optional)',type:'date',hint:'The special hides itself after this day.'},{key:'link',label:'Link for the button (optional)',type:'url',hint:'Empty: the button emails you about the special.'}],
  comment:[{key:'name',label:'Name'},{key:'text',label:'Comment',type:'textarea'},{key:'date',label:'Date',type:'date'}],
  media:[{key:'title',label:'Title'},{key:'caption',label:'Short description',type:'textarea'}],
  software:[{key:'name',label:'Name',required:true},{key:'icon',label:'App icon (square, like on Google Play: 512 × 512)',type:'image',size:'icon'},{key:'shot',label:'Feature graphic (the wide picture behind the app’s card and page: 1024 × 500)',type:'image',size:'graphic'},{key:'screenshots',label:'Screenshots (pick several at once)',type:'images',hint:'They show in a row on the app’s page and under Pictures & videos. Edit or delete them there.'},{key:'status',label:'Status',hint:'e.g. Beta · testers wanted'},{key:'tagline',label:'One-line description'},{key:'description',label:'About the app (a few short paragraphs)',type:'textarea',hint:'Leave an empty line between paragraphs.'},{key:'features',label:'Features (one per line)',type:'lines'},{key:'platform',label:'Runs on',hint:'e.g. Windows 10 / 11'},{key:'version',label:'Version'},{key:'price',label:'Price'},{key:'priceNote',label:'Price note'},{key:'cta',label:'Main button text',hint:'e.g. Become a tester'},{key:'download',label:'Download link (optional)',type:'url',hint:'When filled in, the main button downloads the app.'},{key:'meta',label:'Small print'}],
@@ -423,7 +447,7 @@ var SCHEMA={
 
 /* ---------- each app keeps its own pictures, videos and user guide ---------- */
 function migrate(){
-  S.software=S.software||[];S.news=S.news||[];S.reviews=S.reviews||[];S.socials=S.socials||[];
+  S.software=S.software||[];S.news=S.news||[];S.reviews=S.reviews||[];S.specials=S.specials||[];S.socials=S.socials||[];
   var gal=S.gallery||[],docs=S.docs||[];
   S.software.forEach(function(p){
     if(!p.id)p.id=slug(p.name);
@@ -445,7 +469,7 @@ function render(){
   migrate();
   var r=route(),P=S.profile,app=$('#app');app.innerHTML='';
   var p=r.app?appById(r.app):null;
-  var nav=[['Apps','#apps'],['About','#about'],['Services','#services'],['News','#news'],['Contact','#contact']];
+  var nav=[['Apps','#apps'],['About','#about'],['Services','#services']].concat(activeSpecials().length?[['Specials','#specials']]:[]).concat([['What’s new','#news'],['Reviews','#reviews'],['Contact','#contact']]);
   app.appendChild(h('header',{class:'top'},[h('div',{class:'wrap nav'},[
     h('a',{class:'brand',href:'#top',onclick:function(e){if(route().app){e.preventDefault();go('#top')}}},[h('span',{class:'logo',text:initials()}),P.name]),
     h('nav',{class:'links',id:'links'},nav.map(function(l){return h('a',{href:l[1],text:l[0],class:p&&l[0]==='Apps'?'on':null,onclick:function(e){$('#links').classList.remove('open');if(route().app){e.preventDefault();homeThen(l[1])}}})})),
@@ -493,10 +517,16 @@ function homePage(app){
   // services
   app.appendChild(h('section',{class:'alt',id:'services'},[h('div',{class:'wrap'},[head('What I do','Apps and websites, <span class="grad">built in Python</span>','From mobile and desktop apps to websites and APIs — one language, every platform.',[addBtn('services',SCHEMA.services,'Add a service',{icon:'code'})]),
     h('div',{class:'cards'},S.services.map(function(s){return h('div',{class:'card'},[h('div',{class:'ic',html:svg(s.icon)}),h('h3',{text:s.title}),h('p',{text:s.text}),h('div',{class:'tags'},(s.tags||[]).map(function(t){return h('span',{class:'tag',text:t})})),edBtns('services',s,SCHEMA.services,'Edit service')])}))])]));
+  // on special (only while there is one; always in edit mode so one can be added)
+  var sp=activeSpecials();
+  if(sp.length||editing)app.appendChild(h('section',{class:'alt',id:'specials'},[h('div',{class:'wrap'},[
+    head('On special','Deals <span class="grad">right now</span>','Offers for a short time. Ask me about any of them.',[addBtn('specials',SCHEMA.specials,'Add a special',{})]),
+    sp.length?h('div',{class:'specials'},sp.map(specialCard)):h('div',{class:'empty',text:'No specials now. Add one with + Add (it shows only while it runs).'}),
+    editing&&S.specials.length>sp.length?h('div',{class:'hint',style:'margin-top:10px',text:(S.specials.length-sp.length)+' ended special(s) are hidden from visitors.'}):null])]));
   // news
   var news=S.news.slice().sort(function(a,b){return a.date<b.date?1:-1});
   app.appendChild(h('section',{id:'news'},[h('div',{class:'wrap'},[
-    head('News','What’s new',null,[h('button',{class:'btn small primary edit-only',onclick:writePost,text:'+ Write a post'})]),
+    head('What’s new','News and updates',null,[h('button',{class:'btn small primary edit-only',onclick:writePost,text:'+ Write a post'})]),
     news.length?h('div',{class:'news'},news.map(postCard)):h('div',{class:'empty',text:'No news yet.'})])]));
   app.appendChild(reviewsSection());
   // contact
@@ -512,6 +542,7 @@ function appCard(p){
   return h('a',{class:'appcard',href:'#app/'+encodeURIComponent(p.id),'aria-label':'Open '+p.name},[
     h('div',{class:'banner'},[p.shot?h('img',{src:p.shot,alt:'',loading:'lazy'}):null,p.status?h('span',{class:'chip',text:p.status}):null]),
     h('div',{class:'body'},[appIcon(p,'icon'),h('h3',{text:p.name}),h('p',{text:p.tagline}),
+      appStars(p),
       h('div',{class:'counts'},counts(p).map(function(c){return h('span',{html:c[0]+esc(c[1])})}).concat(p.platform?[h('span',{text:p.platform})]:[])),
       h('span',{class:'go',html:svg('arrow')})])]);
 }
@@ -557,6 +588,7 @@ function overviewTab(pane,p){
         h('a',{class:'btn small',style:'margin-top:12px;width:100%',href:'#app/'+p.id+'/media',text:'See all '+media.length})]):null,
       p.price?h('div',{class:'box'},[h('h3',{text:'Price'}),h('div',{class:'price'},[h('b',{text:p.price})]),p.priceNote?h('div',{class:'hint',text:p.priceNote}):null,
         h('a',{class:'btn primary small',style:'margin-top:14px;width:100%',href:p.download||'#app/'+p.id+'/get',text:p.download?'Download':(p.cta||'Get '+p.name)}),p.meta?h('div',{class:'meta',text:p.meta}):null]):null,
+      rateBox(p),
       p.guide?h('div',{class:'box'},[h('h3',{text:'Learn '+p.name}),h('p',{class:'hint',style:'margin:0 0 12px',text:(p.guide.sections||[]).length+' topics, step by step. Read it here or keep the PDF.'}),
         h('div',{class:'actions'},[h('a',{class:'btn small',href:'#app/'+p.id+'/guide',html:svg('book')+' Open the guide'}),p.guide.pdf?h('a',{class:'btn small',href:p.guide.pdf,download:p.name+'_User_Guide.pdf',target:'_blank',rel:'noopener',html:svg('download')+' PDF'}):null])]):null])]));
   pane.appendChild(h('div',{class:'h3row'},[h('h3',{text:'News about '+p.name}),h('button',{class:'btn small primary edit-only',onclick:function(){writePost(p.name)},text:'+ Write a post'})]));
@@ -679,21 +711,50 @@ function postCard(n){
     h('a',{href:'https://www.linkedin.com/sharing/share-offsite/?url='+enc(url),target:'_blank',rel:'noopener',title:'Share on LinkedIn',html:svg('linkedin')}),
     h('a',{href:'https://twitter.com/intent/tweet?text='+enc(txt)+'&url='+enc(url),target:'_blank',rel:'noopener',title:'Share on X',html:svg('x')}),
     h('button',{class:'s',title:'Copy link',onclick:function(){if(navigator.share){navigator.share({title:n.title,url:url}).catch(function(){})}else copyText(url,'Link copied')},html:svg('link')})]);
-  var cm=(n.comments||[]);
+  var cm=(n.comments||[]).concat(fbFor('news:'+n.id).map(function(r){return {name:r.name,text:r.text,date:r.date,live:r}}));
   return h('article',{class:'post'+(n.image?'':' noimg'),id:'post-'+n.id},[
     n.image?h('div',{class:'pimg'},[h('img',{src:n.image,alt:''})]):null,
     h('div',{class:'pbody'},[h('div',{class:'pmeta'},[h('time',{datetime:n.date,text:fmtDate(n.date)}),n.tag?h('span',{class:'ptag',text:'· '+n.tag}):null,cm.length?h('span',{text:'· '+cm.length+' comment'+(cm.length>1?'s':'')}):null]),
       h('h3',{text:n.title})].concat(paras(n.body)).concat([
-      cm.length?h('div',{class:'comments'},cm.map(function(c){return h('div',{class:'cmt'},[h('b',{text:c.name}),h('span',{class:'d',text:fmtDate(c.date)}),h('p',{text:c.text}),editing?h('div',{class:'row',style:'justify-content:flex-start'},[h('button',{class:'btn small danger',onclick:function(){n.comments=n.comments.filter(function(x){return x!==c});changed()},text:'Remove comment'})]):null])})):null,
+      cm.length?h('div',{class:'comments'},cm.map(function(c){return h('div',{class:'cmt'},[h('b',{text:c.name}),h('span',{class:'d',text:fmtDate(c.date)}),h('p',{text:c.text}),(editing||(c.live&&vcOwner()))?h('div',{class:'row',style:'justify-content:flex-start'},[h('button',{class:'btn small danger',onclick:function(){if(c.live){fbHide(c.live);return}n.comments=n.comments.filter(function(x){return x!==c});changed()},text:'Remove comment'})]):null])})):null,
       share,
       h('div',{class:'ed'},[h('button',{class:'btn small',onclick:function(){editRecord('Edit post',n,SCHEMA.news)},text:'Edit'}),h('button',{class:'btn small',onclick:function(){var c={date:today()};editRecord('Add a comment you received',c,SCHEMA.comment,function(){(n.comments=n.comments||[]).push(c)})},text:'+ Add a comment'}),h('button',{class:'btn small danger',onclick:function(){if(window.confirm('Delete this post?')){S.news=S.news.filter(function(x){return x!==n});changed()}},text:'Delete'})])]))]);
 }
+function liveReviews(target){return fbFor(target).filter(function(r){return +r.stars>0}).map(function(r){return {name:r.name,role:r.role,stars:r.stars,text:r.text,date:r.date,live:r}})}
+function rvCard(r){return h('div',{class:'rv'},[stars(r.stars),r.text?h('p',{text:'“'+r.text+'”'}):null,h('div',{class:'who'},[h('div',{class:'av',text:(r.name||'?')[0]}),h('div',{},[h('b',{text:r.name}),h('span',{text:[r.role,r.date?fmtDate(r.date):''].filter(Boolean).join(' · ')})])]),
+  r.live?((vcOwner()||editing)?h('div',{class:'row',style:'justify-content:flex-start;margin-top:10px'},[h('button',{class:'btn small danger',onclick:function(){fbHide(r.live)},text:'Remove'})]):null):edBtns('reviews',r,SCHEMA.reviews,'Edit review')])}
+function avgOf(R){return R.length?R.reduce(function(a,r){return a+(+r.stars||0)},0)/R.length:0}
 function reviewsSection(){
-  var R=S.reviews,avg=R.length?R.reduce(function(a,r){return a+(+r.stars||0)},0)/R.length:0;
+  var R=liveReviews('site').concat(S.reviews.slice().sort(function(a,b){return (a.date||'')<(b.date||'')?1:-1})),avg=avgOf(R);
+  var appR=[];S.software.forEach(function(p){appR=appR.concat(liveReviews('app:'+p.id))});
   return h('section',{class:'alt',id:'reviews'},[h('div',{class:'wrap'},[
-    head('Reviews','What people say',null,[h('button',{class:'btn primary',onclick:rateForm,html:'★ Rate my work'}),addBtn('reviews',SCHEMA.reviews,'Add a review you received',{stars:'5',date:today()})]),
-    R.length?h('div',{class:'rv-top'},[h('div',{class:'avg',text:avg.toFixed(1)}),h('div',{},[stars(avg),h('div',{class:'hint',text:'from '+R.length+' review'+(R.length>1?'s':'')})])]):h('div',{class:'empty',text:'No reviews yet — be the first to rate my work.'}),
-    R.length?h('div',{class:'cards'},R.map(function(r){return h('div',{class:'rv'},[stars(r.stars),h('p',{text:'“'+r.text+'”'}),h('div',{class:'who'},[h('div',{class:'av',text:(r.name||'?')[0]}),h('div',{},[h('b',{text:r.name}),h('span',{text:[r.role,r.date?fmtDate(r.date):''].filter(Boolean).join(' · ')})])]),edBtns('reviews',r,SCHEMA.reviews,'Edit review')])})):null])]);
+    head('Reviews','What people say',FB.on?'Rate my work and it shows here straight away.':null,[h('button',{class:'btn primary',onclick:function(){rateForm('site','Rate my work')},html:'★ Rate my work'}),addBtn('reviews',SCHEMA.reviews,'Add a review you received',{stars:'5',date:today()})]),
+    R.length?h('div',{class:'rv-top'},[h('div',{class:'avg',text:avg.toFixed(1)}),h('div',{},[stars(avg),h('div',{class:'hint',text:'from '+R.length+' review'+(R.length>1?'s':'')})]),
+      appR.length?h('div',{class:'hint',style:'margin-left:auto',text:S.software.map(function(p){var x=liveReviews('app:'+p.id);return x.length?p.name+': '+avgOf(x).toFixed(1)+' ★ ('+x.length+')':''}).filter(Boolean).join(' · ')}):null]):h('div',{class:'empty',text:'No reviews yet — be the first to rate my work.'}),
+    R.length?h('div',{class:'cards'},R.map(rvCard)):null])]);
+}
+function appStars(p){var R=liveReviews('app:'+p.id);if(!R.length)return null;var a=avgOf(R);return h('div',{class:'rstars'},[stars(a),h('span',{text:a.toFixed(1)+' · '+R.length+' rating'+(R.length>1?'s':'')})])}
+function rateBox(p){
+  var R=liveReviews('app:'+p.id),a=avgOf(R);
+  return h('div',{class:'box rate-box'},[h('h3',{text:'Ratings'}),
+    R.length?h('div',{class:'bigavg'},[h('b',{text:a.toFixed(1)}),h('div',{},[stars(a),h('div',{class:'hint',text:R.length+' rating'+(R.length>1?'s':'')})])]):h('p',{class:'hint',style:'margin:0 0 10px',text:'No ratings yet. Tried '+p.name+'? Be the first.'}),
+    h('button',{class:'btn small primary',style:'width:100%',onclick:function(){rateForm('app:'+p.id,'Rate '+p.name)},html:'★ Rate '+esc(p.name)})].concat(
+    R.slice(0,3).map(function(r){return h('div',{class:'mini-rv'},[stars(r.stars),h('b',{style:'margin-left:6px',text:r.name}),r.text?h('p',{text:r.text}):null,
+      (vcOwner()||editing)?h('button',{class:'btn small danger',style:'margin-top:6px',onclick:function(){fbHide(r.live)},text:'Remove'}):null])})));
+}
+function activeSpecials(){var t=today();return (S.specials||[]).filter(function(s){return !s.ends||s.ends>=t})}
+function specialCard(s){
+  var P=S.profile;
+  return h('div',{class:'spec'},[
+    s.image?h('div',{class:'simg'},[h('img',{src:s.image,alt:'',loading:'lazy'}),s.price?h('span',{class:'badge',text:s.price}):null]):null,
+    h('div',{class:'sb'},[!s.image&&s.price?h('span',{class:'badge',style:'position:static;align-self:flex-start',text:s.price}):null,
+      h('h3',{text:s.title}),
+      s.price||s.was?h('div',{class:'pr'},[s.price?h('b',{class:'grad',text:s.price}):null,s.was?h('s',{text:s.was}):null]):null,
+      s.text?h('p',{text:s.text}):null,
+      s.ends?h('div',{class:'ends',text:'Ends '+fmtDate(s.ends)}):null,
+      h('div',{class:'actions'},[s.link?h('a',{class:'btn small primary',href:s.link,target:'_blank',rel:'noopener',text:'Get it'}):
+        h('a',{class:'btn small primary',href:'mailto:'+P.email+'?subject='+encodeURIComponent('Special: '+s.title),html:svg('mail')+' Ask about it'})]),
+      edBtns('specials',s,SCHEMA.specials,'Edit special')])]);
 }
 function sendToOwner(subject,body,form){
   var P=S.profile;var full=body+'\n\n— sent from '+siteUrl();
@@ -704,28 +765,55 @@ function sendToOwner(subject,body,form){
   box.appendChild(h('div',{class:'row',style:'justify-content:flex-start;margin-top:8px'},[h('code',{style:'user-select:all;font-weight:600',text:P.email}),h('button',{class:'btn small',type:'button',onclick:function(){copyText(P.email,'Email copied')},text:'Copy email'})]));
   box.appendChild(h('div',{class:'hint',style:'margin-top:6px',text:'Elton reads every message and adds it to the site.'}));
 }
+function hp(){return h('input',{class:'hp',name:'website',tabindex:'-1',autocomplete:'off','aria-hidden':'true'})}
 function commentForm(n){
   var ov=$('#ov');ov.innerHTML='';
-  var name=h('input',{required:true}),text=h('textarea',{required:true});
-  var form=h('form',{class:'panel',onsubmit:function(e){e.preventDefault();sendToOwner('Comment on: '+n.title,'Name: '+name.value+'\nComment: '+text.value,form)}},[
-    h('h3',{text:'Comment on “'+n.title+'”'}),h('p',{class:'sub',text:'Comments are sent to Elton and shown under the post once he adds them.'}),
-    h('div',{class:'field'},[h('label',{text:'Your name'}),name]),h('div',{class:'field'},[h('label',{text:'Comment'}),text]),
-    n.fb?h('p',{class:'hint'},['Or ',h('a',{href:n.fb,target:'_blank',rel:'noopener',text:'comment on the Facebook post'}),' — it shows straight away.']):null,
+  var name=h('input',{required:true,maxlength:60}),text=h('textarea',{required:true,maxlength:1000});
+  var form=h('form',{class:'panel',onsubmit:function(e){e.preventDefault();
+      if(FB.on)fbSend({target:'news:'+n.id,stars:0,name:name.value,text:text.value},form,function(){closeOv();rerender();toast('Thank you! Your comment is up.')});
+      else sendToOwner('Comment on: '+n.title,'Name: '+name.value+'\nComment: '+text.value,form)}},[
+    h('h3',{text:'Comment on “'+n.title+'”'}),h('p',{class:'sub',text:FB.on?'Your comment shows under the post straight away.':'Comments are sent to Elton and shown under the post once he adds them.'}),
+    h('div',{class:'field'},[h('label',{text:'Your name'}),name]),h('div',{class:'field'},[h('label',{text:'Comment'}),text]),hp(),
+    n.fb?h('p',{class:'hint'},['Or ',h('a',{href:n.fb,target:'_blank',rel:'noopener',text:'comment on the Facebook post'}),'.']):null,
     h('div',{class:'row'},[h('button',{class:'btn',type:'button',onclick:closeOv,text:'Close'}),h('button',{class:'btn primary',type:'submit',text:'Send comment'})])]);
   ov.appendChild(form);ov.classList.add('open');name.focus();
 }
-function rateForm(){
+function rateForm(target,title){
+  if(typeof target!=='string'){target='site';title='Rate my work'}
   var ov=$('#ov');ov.innerHTML='';var val=5;
   var pick=h('div',{class:'starpick',role:'radiogroup','aria-label':'Stars'});
   function draw(){pick.innerHTML='';for(var i=1;i<=5;i++)(function(i){pick.appendChild(h('button',{type:'button',class:i<=val?'on':'','aria-label':i+' stars',onclick:function(){val=i;draw()},text:'★'}))})(i)}
   draw();
-  var name=h('input',{required:true}),role=h('input',{placeholder:'e.g. House plan designer, Johannesburg'}),text=h('textarea',{required:true});
-  var form=h('form',{class:'panel',onsubmit:function(e){e.preventDefault();sendToOwner('Review: '+val+' stars','Stars: '+val+'/5\nName: '+name.value+'\nWho: '+role.value+'\nReview: '+text.value,form)}},[
-    h('h3',{text:'Rate my work'}),h('p',{class:'sub',text:'Tell me what you think of my website or software.'}),
-    h('div',{class:'field'},[h('label',{text:'Your rating'}),pick]),h('div',{class:'field'},[h('label',{text:'Your name'}),name]),h('div',{class:'field'},[h('label',{text:'Who you are (optional)'}),role]),h('div',{class:'field'},[h('label',{text:'Your review'}),text]),
-    h('div',{class:'row'},[h('button',{class:'btn',type:'button',onclick:closeOv,text:'Close'}),h('button',{class:'btn primary',type:'submit',text:'Send review'})])]);
+  var name=h('input',{required:true,maxlength:60}),role=h('input',{maxlength:80,placeholder:'e.g. House plan designer, Johannesburg'}),text=h('textarea',{maxlength:1000,required:!FB.on});
+  var form=h('form',{class:'panel',onsubmit:function(e){e.preventDefault();
+      if(FB.on)fbSend({target:target,stars:val,name:name.value,role:role.value,text:text.value},form,function(){closeOv();rerender();toast('Thank you for rating!')});
+      else sendToOwner(title+': '+val+' stars','Stars: '+val+'/5\nName: '+name.value+'\nWho: '+role.value+'\nReview: '+text.value,form)}},[
+    h('h3',{text:title}),h('p',{class:'sub',text:FB.on?'Pick the stars and say a few words. It shows on the site straight away.':'Tell me what you think of my website or software.'}),
+    h('div',{class:'field'},[h('label',{text:'Your rating'}),pick]),h('div',{class:'field'},[h('label',{text:'Your name'}),name]),h('div',{class:'field'},[h('label',{text:'Who you are (optional)'}),role]),h('div',{class:'field'},[h('label',{text:FB.on?'Your review (optional)':'Your review'}),text]),hp(),
+    h('div',{class:'row'},[h('button',{class:'btn',type:'button',onclick:closeOv,text:'Close'}),h('button',{class:'btn primary',type:'submit',text:'Send'})])]);
   ov.appendChild(form);ov.classList.add('open');
 }
+/* ---------- live ratings, reviews and comments: the same free Worker as the visitor counter ---------- */
+var FB={on:false,list:[]};
+function fbFor(target){return FB.list.filter(function(r){return r.target===target})}
+function rerender(){if($('#ov')&&$('#ov').classList.contains('open'))return;var y=window.scrollY;render();window.scrollTo(0,y)}
+function fbLoad(){var u=vcUrl();if(!u||location.protocol==='file:'||(window.claude&&claude.use))return;
+  fetch(u+'/reviews?site=nova').then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+    if(!d||!d.ok||!Array.isArray(d.reviews))return;FB.on=true;FB.list=d.reviews;rerender()}).catch(function(){})}
+function fbSend(o,form,done){
+  o.site='nova';var w=form.querySelector('[name=website]');o.website=w?w.value:'';
+  var btn=form.querySelector('[type=submit]');if(btn){btn.disabled=true;btn.textContent='Sending…'}
+  fetch(vcUrl()+'/review',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(o)}).then(function(r){return r.json()}).then(function(d){
+    if(!d||!d.ok)throw new Error(d&&d.error||'Could not send');if(d.review)FB.list.unshift(d.review);done(d.review)})
+  .catch(function(e){if(btn){btn.disabled=false;btn.textContent='Send'}
+    var box=form.querySelector('.okmsg')||form.insertBefore(h('div',{class:'okmsg'}),form.querySelector('.row'));box.textContent=(e&&e.message)||'Could not send. Try again in a moment.'})}
+function vcOwner(){try{return !!localStorage.getItem('vc_key')}catch(e){return false}}
+function fbHide(r){var key='';try{key=localStorage.getItem('vc_key')||''}catch(e){}
+  if(!key){toast('Open 📊 Visitors and type your counter password first');return}
+  if(!window.confirm('Remove this from the website?'))return;
+  fetch(vcUrl()+'/review/hide',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({site:'nova',id:r.id,key:key})}).then(function(x){return x.json()}).then(function(d){
+    if(!d.ok)throw new Error(d.error==='key'?'Your counter password is not right':'Could not remove it');FB.list=FB.list.filter(function(x){return x!==r});rerender();toast('Removed')})
+  .catch(function(e){toast(e.message||'Could not remove it')})}
 function copyText(t,msg){if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){if(msg)toast(msg)},function(){if(msg)toast('Select it and press Ctrl+C')});else if(msg)toast('Select it and press Ctrl+C')}
 function flipTheme(){var r=document.documentElement;var dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('theme',r.dataset.theme)}catch(e){}}
 try{var th=localStorage.getItem('theme');if(th)document.documentElement.dataset.theme=th}catch(e){}
@@ -964,19 +1052,22 @@ if(window.claude&&claude.use){
 }
 /* ---------- visitor counter: Cloudflare Web Analytics (free, no cookies) ---------- */
 (function(){try{var t=String((S.profile||{}).cfToken||''),x=t.match(/"token"\s*:\s*"([^"]+)"/);if(x)t=x[1];t=t.trim();
-  if(!t||!/^[A-Za-z0-9_-]{8,}$/.test(t)||location.protocol==='file:'||/edit/.test(location.hash)||(window.claude&&claude.use))return;
+  if(!t||!/^[A-Za-z0-9_-]{8,}$/.test(t)||location.protocol==='file:'||vcMine()||(window.claude&&claude.use))return;
   var b=document.createElement('script');b.type='module';b.defer=true;b.src='https://static.cloudflareinsights.com/beacon.min.js';
   b.setAttribute('data-cf-beacon',JSON.stringify({token:t}));document.head.appendChild(b)}catch(e){}})();
 /* ---------- your own visitor counter (a free Cloudflare Worker; no cookies) ---------- */
+/* your own visits are never counted: this device is marked once you open the site to edit it or type your
+   counter password in 📊 Visitors (and you can switch it in that panel) */
+function vcMine(){try{if(/(^|[?&#])edit($|[&=#])/.test(location.search+location.hash))localStorage.setItem('vc_me','1');return localStorage.getItem('vc_me')==='1'}catch(e){return false}}
 function vcUrl(){var u=String((S.profile||{}).counterUrl||'').trim().replace(/\/+$/,'');return /^https:\/\//.test(u)?u:''}
 var vcShown='';
 function vcPath(){var hs=location.hash||'';return '/'+(/^#app\//.test(hs)?hs.split('/').slice(0,3).join('/'):'')}
 var vcLast='';
-function vcHit(){var u=vcUrl();if(!u||editing||/edit/.test(location.hash)||(window.claude&&claude.use)||location.protocol==='file:')return;
+function vcHit(){var u=vcUrl();if(!u||editing||vcMine()||(window.claude&&claude.use)||location.protocol==='file:')return;
   var p=vcPath();if(p===vcLast)return;vcLast=p;
-  try{fetch(u+'/hit',{method:'POST',keepalive:true,headers:{'Content-Type':'text/plain'},body:JSON.stringify({path:p,ref:document.referrer||''})}).catch(function(){})}catch(e){}}
+  try{fetch(u+'/hit',{method:'POST',keepalive:true,headers:{'Content-Type':'text/plain'},body:JSON.stringify({site:'nova',path:p,ref:document.referrer||''})}).catch(function(){})}catch(e){}}
 function vcPublic(){var u=vcUrl();if(!u||!/^y/i.test(String((S.profile||{}).publicCount||'')))return;
-  fetch(u+'/count').then(function(r){return r.json()}).then(function(d){if(!d||!d.visitors)return;
+  fetch(u+'/count?site=nova').then(function(r){return r.json()}).then(function(d){if(!d||!d.visitors)return;
     vcShown=' · '+Number(d.visitors).toLocaleString()+' visitors';var el=$('#vcount');if(el)el.textContent=vcShown}).catch(function(){})}
 function visitorsPanel(){
   var ov=$('#ov');ov.innerHTML='';var key='';try{key=localStorage.getItem('vc_key')||''}catch(e){}
@@ -999,9 +1090,13 @@ function visitorsPanel(){
     return h('div',{style:'display:flex;align-items:flex-end;gap:3px;height:90px;margin:14px 0 4px'},days.map(function(d){
       return h('div',{title:d.day+': '+d.visitors+' visitors, '+d.views+' views',style:'flex:1;background:var(--accent,#ff8c38);border-radius:3px 3px 0 0;min-height:2px;height:'+Math.round(d.visitors/mx*100)+'%'})}))}
   function load(){if(!key)return ask();body.innerHTML='';body.appendChild(h('p',{class:'hint',text:'Loading…'}));
-    fetch(vcUrl()+'/stats?key='+encodeURIComponent(key)).then(function(r){return r.json().then(function(d){return [r.status,d]})}).then(function(x){
+    fetch(vcUrl()+'/stats?site=nova&key='+encodeURIComponent(key)).then(function(r){return r.json().then(function(d){return [r.status,d]})}).then(function(x){
       var st=x[0],d=x[1];if(st===403)return ask('That password is not right. Type the OWNER_KEY you set in Cloudflare.');
       if(d.error)throw new Error(d.error);body.innerHTML='';
+      try{if(localStorage.getItem('vc_me')!=='0')localStorage.setItem('vc_me','1')}catch(x){}
+      var me=vcMine();body.appendChild(h('div',{class:'hint',style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px'},[
+        h('span',{style:'margin-right:auto',text:me?'✓ Your visits on this device are not counted.':'Your visits on this device are counted.'}),
+        h('button',{class:'btn small',onclick:function(){try{localStorage.setItem('vc_me',me?'0':'1')}catch(x){}load()},text:me?'Count this device':'Don’t count this device'})]));
       body.appendChild(h('div',{style:'display:flex;gap:10px;flex-wrap:wrap'},[card('Today',d.today),card('Last 7 days',d.week),card('Last 30 days',d.month),card('All time',d.total)]));
       body.appendChild(h('div',{class:'hint',style:'margin-top:10px',text:'Visitors per day, last 30 days'}));body.appendChild(chart(d.days||[]));
       body.appendChild(h('div',{style:'display:flex;gap:18px;flex-wrap:wrap'},[
@@ -1011,6 +1106,6 @@ function visitorsPanel(){
     }).catch(function(e){body.innerHTML='';body.appendChild(h('p',{class:'hint',text:'Could not reach the counter: '+(e.message||e)}))})}
   load();
 }
-vcHit();vcPublic();window.addEventListener('hashchange',vcHit);
+vcHit();vcPublic();fbLoad();window.addEventListener('hashchange',vcHit);
 })();
 </script></body></html>
