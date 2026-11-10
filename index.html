@@ -241,6 +241,19 @@ body.editing .ed{display:flex}
 .steps li:before{content:counter(s);flex:none;width:30px;height:30px;border-radius:10px;background:var(--grad);color:#fff;display:grid;place-items:center;font:700 14px Sora}
 .steps b{color:var(--ink)}
 @media (max-width:860px){.getit{grid-template-columns:1fr}}
+.shop{margin-top:22px;padding:30px}
+.shop .terms{display:inline-flex;gap:6px;margin:6px 0 18px;padding:4px;border:1px solid var(--line,#2a3142);border-radius:999px}
+.shop .terms button{border:0;background:none;color:inherit;padding:6px 14px;border-radius:999px;cursor:pointer;font:inherit}
+.shop .terms button.on{background:var(--accent,#f59e0b);color:#111}
+.shop .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.shop .plan{border:1px solid var(--line,#2a3142);border-radius:14px;padding:18px;cursor:pointer;text-align:left;background:none;color:inherit;font:inherit;display:flex;flex-direction:column;justify-content:flex-start}
+.shop .plan.on{border-color:var(--accent,#f59e0b);box-shadow:0 0 0 2px var(--accent,#f59e0b) inset}
+.shop .plan b{font-size:1.15em}.shop .plan .amt{font-size:1.6em;font-weight:700;margin:6px 0}.shop .plan small{opacity:.75;display:block;line-height:1.45}
+.shop .ids{display:grid;gap:8px;margin:18px 0 6px;max-width:420px}
+.shop input{padding:11px 12px;border-radius:10px;border:1px solid var(--line,#2a3142);background:transparent;color:inherit;font:inherit;letter-spacing:.06em;text-transform:uppercase}
+.shop .codes{margin-top:16px;display:grid;gap:10px}.shop .code{font:600 1.25em ui-monospace,Consolas,monospace;letter-spacing:.08em}
+@media (max-width:860px){.shop .plans{grid-template-columns:1fr}}
+
 /* news */
 .news{display:grid;gap:18px}
 .post{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;display:grid;grid-template-columns:minmax(0,280px) 1fr}
@@ -447,7 +460,7 @@ var SCHEMA={
  comment:[{key:'name',label:'Name'},{key:'text',label:'Comment',type:'textarea'},{key:'date',label:'Date',type:'date'}],
  media:[{key:'title',label:'Title'},{key:'caption',label:'Short description',type:'textarea'}],
  software:[{key:'name',label:'Name',required:true},{key:'github',label:'Installer on GitHub (owner/repository)',hint:'Put the installer (.exe, .msi, .zip, .apk) on a Release of this repository; it can be private. Empty, or no file yet: the Download button says Coming soon.'},{key:'icon',label:'App icon (square, like on Google Play: 512 × 512)',type:'image',size:'icon'},{key:'shot',label:'Feature graphic (the wide picture behind the app’s card and page: 1024 × 500)',type:'image',size:'graphic'},{key:'screenshots',label:'Screenshots (pick several at once)',type:'images',hint:'They show in a row on the app’s page and under Pictures & videos. Edit or delete them there.'},{key:'status',label:'Status',hint:'e.g. Beta · testers wanted'},{key:'tagline',label:'One-line description'},{key:'description',label:'About the app (a few short paragraphs)',type:'textarea',hint:'Leave an empty line between paragraphs.'},{key:'features',label:'Features (one per line)',type:'lines'},{key:'platform',label:'Runs on',hint:'e.g. Windows 10 / 11'},{key:'version',label:'Version'},{key:'price',label:'Price'},{key:'priceNote',label:'Price note'},{key:'cta',label:'Main button text',hint:'e.g. Become a tester'},{key:'download',label:'Download link (optional)',type:'url',hint:'When filled in, the main button downloads the app.'},{key:'meta',label:'Small print'}],
- profile:[{key:'photo',label:'Your photo',type:'image'},{key:'name',label:'Full name'},{key:'hello',label:'Greeting above your name'},{key:'roles',label:'Roles that type themselves (one per line)',type:'lines'},{key:'about',label:'Short intro (top of page)',type:'textarea'},{key:'aboutLong',label:'About me (longer)',type:'textarea'},{key:'startYear',label:'Year you started programming',type:'number'},{key:'available',label:'Badge on your photo',hint:'e.g. Available for projects'},{key:'email',label:'Email',type:'email'},{key:'phone',label:'Phone / WhatsApp (optional)'},{key:'location',label:'Location (optional)'},{key:'contactNote',label:'Contact text',type:'textarea'},{key:'siteUrl',label:'This website’s link',type:'url',hint:'Used by the Share buttons. Paste the link you share with people.'},{key:'cfToken',label:'Visitor counter (Cloudflare Web Analytics token)',hint:'Paste the token, or the whole code Cloudflare gives you. Leave empty to turn the counter off.'},{key:'counterUrl',label:'Your own visitor counter (Worker link)',type:'url',hint:'The link of your Cloudflare Worker, like https://visitor-counter.yourname.workers.dev. The 📊 Visitors button shows its numbers.'},{key:'publicCount',label:'Show the number of visitors to everyone? (yes / no)',hint:'Type yes to show it at the bottom of the page.'}]
+ profile:[{key:'photo',label:'Your photo',type:'image'},{key:'shopUrl',label:'Nestify shop address (the nestify-shop Worker, like https://nestify-shop.you.workers.dev)'},{key:'name',label:'Full name'},{key:'hello',label:'Greeting above your name'},{key:'roles',label:'Roles that type themselves (one per line)',type:'lines'},{key:'about',label:'Short intro (top of page)',type:'textarea'},{key:'aboutLong',label:'About me (longer)',type:'textarea'},{key:'startYear',label:'Year you started programming',type:'number'},{key:'available',label:'Badge on your photo',hint:'e.g. Available for projects'},{key:'email',label:'Email',type:'email'},{key:'phone',label:'Phone / WhatsApp (optional)'},{key:'location',label:'Location (optional)'},{key:'contactNote',label:'Contact text',type:'textarea'},{key:'siteUrl',label:'This website’s link',type:'url',hint:'Used by the Share buttons. Paste the link you share with people.'},{key:'cfToken',label:'Visitor counter (Cloudflare Web Analytics token)',hint:'Paste the token, or the whole code Cloudflare gives you. Leave empty to turn the counter off.'},{key:'counterUrl',label:'Your own visitor counter (Worker link)',type:'url',hint:'The link of your Cloudflare Worker, like https://visitor-counter.yourname.workers.dev. The 📊 Visitors button shows its numbers.'},{key:'publicCount',label:'Show the number of visitors to everyone? (yes / no)',hint:'Type yes to show it at the bottom of the page.'}]
 };
 
 /* ---------- each app keeps its own pictures, videos and user guide ---------- */
@@ -619,10 +632,86 @@ function getTab(pane,p){
       h('div',{class:'actions',style:'margin-top:20px'},[dlButton(p),
         h('a',{class:'btn',href:'mailto:'+P.email+'?subject='+encodeURIComponent((p.cta&&!/download/i.test(p.cta)?p.cta:'Get')+' – '+p.name),html:svg('mail')+' '+esc(p.cta&&!/download/i.test(p.cta)?p.cta:'Email me')}),
         h('button',{class:'btn',onclick:function(){copyText(P.email,'Email copied')},text:'Copy my email'})]),
-      p.id==='nestify'?h('p',{class:'hint',style:'margin-top:14px',text:'Free trial first. When it ends, Nestify stays locked until you enter an unlock code made for your computer: buy it, or get one free as a chosen beta tester.'}):null]),
+      p.id==='nestify'?h('p',{class:'hint',style:'margin-top:14px',text:'Try every tool free for 14 days. Then choose a plan below and pay with Capitec Pay: your unlock code comes straight away, made for your computer.'}):null]),
     h('div',{class:'box'},[h('h3',{text:'How it works'}),h('ol',{class:'steps'},(dlReady(p)?[
         ['Download',' the installer with the button.'],['Install',' it like any other program.'],p.id==='nestify'?['Try it free',' — when the trial ends, send your Computer ID and get your unlock code.']:['Open the guide',' here on the site whenever you need help.']]:[
         ['Email me',' with the button — say a little about how you would use '+p.name+'.'],['Get your copy',' and a licence for your computer.'],['Learn it',' with the user guide on this page, and tell me what you think.']]).map(function(s){return h('li',{},[h('span',{},[h('b',{text:s[0]}),s[1]])])}))])]));
+  if(p.id==='nestify')pane.appendChild(shopBox(p));
+}
+
+/* ---------- buying Nestify (Capitec Pay through Ozow; the shop Worker makes the code) ---------- */
+var SHOP_PLANS=[['home','Home','Homeowners and DIY',{month:149,year:1490},'3 saved projects · plans and pictures with no mark · 20 photo-real renders a month'],
+  ['pro','Pro','Draughtsmen, builders, designers',{month:399,year:3990},'Unlimited projects · council drawing set · construction details · IFC and DXF · estimates and quotes · services, energy and span checks · 200 renders a month · your logo in the title block'],
+  ['office','Office','Firms: 3 people',{month:999,year:9990},'Everything in Pro for 3 computers · one shared supplier price list · sharing projects with your team · priority support']];
+function hashArg(k){var m=new RegExp('[?&]'+k+'=([^&]*)').exec(location.hash||'');return m?decodeURIComponent(m[1]):''}
+var SHOP_FILE='';
+try{fetch('nestify-version.json',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){SHOP_FILE=j.shop||''}).catch(function(){})}catch(e){}
+function shopUrl(){return (S.profile.shopUrl||SHOP_FILE||'').replace(/\/$/,'')}
+function shopBox(p){
+  var st={plan:hashArg('plan')||'pro',term:hashArg('term')==='month'?'month':'year'},ref=hashArg('ref');
+  var box=h('div',{class:'box shop',id:'buy'});
+  if(ref||hashArg('id')||hashArg('plan'))setTimeout(function(){box.scrollIntoView({behavior:'smooth'})},400);
+  if(ref){shopDone(box,ref);return box}
+  function draw(){
+    box.innerHTML='';
+    box.appendChild(h('div',{class:'kicker',text:'Buy '+p.name}));
+    box.appendChild(h('h3',{text:'Choose your plan'}));
+    box.appendChild(h('div',{class:'terms'},[['year','Yearly (2 months free)'],['month','Monthly']].map(function(t){
+      return h('button',{class:st.term===t[0]?'on':null,text:t[1],onclick:function(){st.term=t[0];draw()}})})));
+    box.appendChild(h('div',{class:'plans'},SHOP_PLANS.map(function(pl){
+      return h('button',{class:'plan'+(st.plan===pl[0]?' on':''),onclick:function(){st.plan=pl[0];draw()}},[
+        h('b',{text:pl[1]}),h('small',{text:pl[2]}),h('div',{class:'amt',text:'R'+pl[3][st.term].toLocaleString('en-ZA')}),
+        h('small',{text:st.term==='year'?'a year':'a month'}),h('small',{style:'margin-top:8px',text:pl[4]})])})));
+    var n=st.plan==='office'?3:1,ids=[];
+    var idBox=h('div',{class:'ids'},[h('b',{text:n>1?'The Computer IDs of the 3 computers (Nestify: Help > Your plan)':'Your Computer ID (Nestify: Help > Your plan)'})]);
+    for(var i=0;i<n;i++){var inp=h('input',{placeholder:'K7QXM-2RDTA',maxlength:'11',autocomplete:'off',spellcheck:'false'});if(i===0&&hashArg('id'))inp.value=hashArg('id');ids.push(inp);idBox.appendChild(inp)}
+    var mail=h('input',{type:'email',placeholder:'Your email (for the receipt, optional)',style:'text-transform:none;letter-spacing:0'});idBox.appendChild(mail);
+    box.appendChild(idBox);
+    var msg=h('p',{class:'hint'});
+    function payWith(bank){
+      var list=ids.map(function(x){return x.value.trim()}).filter(Boolean);
+      if(!list.length){msg.textContent='Type the Computer ID from Nestify first (Help > Your plan).';return}
+      if(!shopUrl()){msg.textContent='Buying online opens soon. Email me for now: '+S.profile.email;return}
+      msg.textContent='Getting the payment ready...';
+      fetch(shopUrl()+'/pay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:list,plan:st.plan,term:st.term,email:mail.value,bank:bank})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.error){msg.textContent=d.error;return}
+          var f=h('form',{method:'POST',action:d.action,style:'display:none'});
+          Object.keys(d.fields).forEach(function(k){var i=h('input',{type:'hidden',name:k});i.value=d.fields[k];f.appendChild(i)});
+          document.body.appendChild(f);f.submit()})
+        .catch(function(){msg.textContent='Could not reach the shop. Check your internet and try again.'})}
+    var pl=SHOP_PLANS.filter(function(x){return x[0]===st.plan})[0];
+    box.appendChild(h('div',{class:'actions',style:'margin-top:14px'},[
+      h('button',{class:'btn primary',onclick:function(){payWith('capitec')},text:'Pay R'+pl[3][st.term].toLocaleString('en-ZA')+' with Capitec Pay'}),
+      h('button',{class:'btn',onclick:function(){payWith('other')},text:'Another bank (instant EFT)'})]));
+    box.appendChild(msg);
+    box.appendChild(h('p',{class:'hint',text:'Capitec Pay: approve the payment in your Capitec app — no card details. Payments are handled by Ozow. Your unlock code shows here when it is paid, and Nestify picks it up by itself. '+(st.term==='month'?'Monthly: pay again each month (Nestify reminds you a week before); the new month adds on to the old one.':'Yearly: one payment for 12 months.')}));
+  }
+  draw();
+  return box;
+}
+function shopDone(box,ref){
+  box.innerHTML='';
+  var r=hashArg('r');
+  box.appendChild(h('div',{class:'kicker',text:'Your order '+ref}));
+  var t=h('h3',{text:r==='cancel'?'The payment was cancelled':r==='error'?'The payment did not go through':'Checking the payment...'}),info=h('div',{});
+  box.appendChild(t);box.appendChild(info);
+  box.appendChild(h('div',{class:'actions',style:'margin-top:16px'},[h('a',{class:'btn',href:'#app/nestify/get',text:'Back to the plans'})]));
+  if(r==='cancel'||r==='error'){info.appendChild(h('p',{class:'hint',text:'Nothing was paid. You can try again, or choose another bank.'}));return}
+  var tries=0;
+  (function poll(){
+    fetch(shopUrl()+'/order?ref='+encodeURIComponent(ref)).then(function(x){return x.json()}).then(function(d){
+      if(d.status==='paid'){
+        t.textContent='Paid — thank you! Here is your unlock code';info.innerHTML='';
+        info.appendChild(h('div',{class:'codes'},(d.codes||[]).map(function(c){return h('div',{},[
+          h('div',{class:'hint',text:'Computer '+c.id+' · Nestify '+d.plan+' until '+c.last_day}),
+          h('div',{class:'code',text:c.code}),h('button',{class:'btn small',onclick:function(){copyText(c.code,'Code copied')},text:'Copy the code'})])})));
+        info.appendChild(h('p',{class:'hint',text:'In Nestify: Help > Enter code, paste it, Unlock. (Nestify also fetches it by itself within a minute when it is online.) Keep this page or the code: it only works on that computer.'}));
+        return}
+      if(d.status&&d.status!=='sent'&&d.status!=='pending'){t.textContent='The payment did not go through ('+d.status+')';return}
+      if(++tries<40){t.textContent='Waiting for the bank to confirm...';setTimeout(poll,3000)}
+      else{t.textContent='Still waiting for the bank';info.appendChild(h('p',{class:'hint',text:'Some banks take a few minutes. Keep this page open or come back to it; if it does not show your code, email me with order '+ref+'.'}))}
+    }).catch(function(){if(++tries<40)setTimeout(poll,3000)})})();
 }
 
 /* ---------- pictures and videos ---------- */
