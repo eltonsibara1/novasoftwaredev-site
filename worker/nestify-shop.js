@@ -1,25 +1,25 @@
-// Nestify shop: buying Nestify on novasoftwaredev.co.za with Capitec Pay (through Ozow), and the unlock codes.
-// A Cloudflare Worker with a D1 database. Version 1.
+// Nestify shop: buying Nestify on novasoftwaredev.co.za through Paystack, and the unlock codes.
+// A Cloudflare Worker with a D1 database. Version 2 (Paystack).
 //
 // Bindings (Worker > Settings > Bindings / Variables and Secrets) - typed in Cloudflare, never in a file:
-//   DB                  D1 database (can be the same one as the visitor counter; this Worker makes its own tables)
-//   UNLOCK_KEY          secret: the key Nestify's codes are made with (the KEY in your private
-//                       tools/unlock_phone.html, the long hex text between the quotes)
-//   OZOW_SITE_CODE      Ozow merchant admin > Merchant details: Site code
-//   OZOW_PRIVATE_KEY    secret: Ozow merchant admin > Merchant details: Private key
-//   OZOW_API_KEY        secret (recommended): Ozow merchant admin > Merchant details: API key - each payment is
-//                       checked again with Ozow before a code is made
-//   OZOW_TEST           "true" while testing (no money moves; Ozow lets you pick success or failure), then "false"
-//   OWNER_KEY           secret (optional): your password for /orders (a list of the sales)
+//   DB                   D1 database (can be the same one as the visitor counter; this Worker makes its own tables)
+//   UNLOCK_KEY           secret: the key Nestify's codes are made with (the KEY in your private
+//                        tools/unlock_phone.html, the long hex text between the quotes)
+//   PAYSTACK_SECRET_KEY  secret: Paystack dashboard > Settings > API Keys & Webhooks > Secret key.
+//                        Use the TEST key (sk_test_...) while testing, then the live key (sk_live_...)
+//   OWNER_KEY            secret (optional): your password for /orders (a list of the sales)
+//
+// Paystack dashboard > Settings > API Keys & Webhooks > Webhook URL:
+//   https://<this Worker's address>/paystack/webhook
 //
 // How it works
-//   1. The website's Buy page sends the Computer ID(s), the plan and month / year to  POST /pay.
-//   2. This Worker writes the order, works out the price HERE (the page cannot change it) and answers with the
-//      form for Ozow, signed with your private key. The page sends the buyer to Ozow; "Capitec Pay" takes them
-//      straight to Capitec (the buyer approves in the Capitec app); "Another bank" shows Ozow's bank list.
-//   3. Ozow tells this Worker the result at  POST /ozow/notify. The message is checked (its hash, the amount, and
-//      again with Ozow's API when OZOW_API_KEY is set). When it is paid, the code is made: the plan, until when
-//      (a renewal adds the month or year to the date the last code ran to), for that computer only.
+//   1. The website's Buy page sends the Computer ID(s), the plan, month / year and the buyer's email to POST /pay.
+//   2. This Worker works out the price HERE (the page cannot change it), starts a Paystack transaction and answers
+//      with Paystack's payment page address. The page sends the buyer there (card or bank, as Paystack offers).
+//   3. Paystack tells this Worker the result at POST /paystack/webhook. The message is checked with the signature,
+//      then the transaction is checked again with Paystack's verify call (status and amount). When it is paid, the
+//      code is made: the plan, until when (a renewal adds the month or year to the date the last code ran to), for
+//      that computer only.
 //   4. The buyer comes back to the website, which shows the code (GET /order?ref=...). Nestify can also fetch the
 //      newest code of its own computer (GET /licence?id=...): a code only works on the computer it was made for,
 //      so knowing it is no use to anyone else. That is how monthly renewals unlock without typing.
@@ -30,8 +30,8 @@ const PRICES = {home: {month: 149, year: 1490}, pro: {month: 399, year: 3990}, o
 const NAMES = {home: "Home", pro: "Pro", office: "Office"};
 const LETTER = {home: "H", pro: "P", office: "O"};
 const A32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-const CAPITEC = "913999FA-3A32-4E3D-82F0-A1DF7E9E4F7B";        // Ozow's bank id for Capitec
 const SITE = "https://novasoftwaredev.co.za";
+const PAYSTACK = "https://api.paystack.co";
 
 function cors(req) {
   const o = req.headers.get("Origin") || "";
@@ -73,16 +73,21 @@ function addMonths(d, n) {
 }
 function isoDay(d) { return d.toISOString().slice(0, 10); }
 
-// ------------------------------------------------------------------ Ozow
-async function sha512(s) {
-  const h = await crypto.subtle.digest("SHA-512", new TextEncoder().encode(s.toLowerCase()));
-  return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("");
+// ------------------------------------------------------------------ Paystack
+async function hmacHex512(key, msg) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), {name: "HMAC", hash: "SHA-512"}, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(msg)));
+  return [...sig].map(b => b.toString(16).padStart(2, "0")).join("");
 }
-const REQ_ORDER = ["SiteCode", "CountryCode", "CurrencyCode", "Amount", "TransactionReference", "BankReference",
-  "Optional1", "Optional2", "Optional3", "Optional4", "Optional5", "Customer", "CancelUrl", "ErrorUrl", "SuccessUrl",
-  "NotifyUrl", "IsTest", "SelectedBankId"];
-const RES_ORDER = ["SiteCode", "TransactionId", "TransactionReference", "Amount", "Status", "Optional1", "Optional2",
-  "Optional3", "Optional4", "Optional5", "CurrencyCode", "IsTest", "StatusMessage"];
+function sameText(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+function paystackHeaders(env) {
+  return {Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json", Accept: "application/json"};
+}
 
 async function schema(env) {
   await env.DB.batch([
@@ -100,62 +105,57 @@ async function pay(req, env) {
   let ids = (Array.isArray(b.ids) ? b.ids : [b.id]).map(clean).filter(x => x.length === 10);
   ids = [...new Set(ids)].slice(0, plan === "office" ? 3 : 1);
   if (!ids.length) return json(req, {error: "Type the Computer ID from Nestify (Help > Your plan), like K7QXM-2RDTA."}, 400);
-  if (!env.OZOW_SITE_CODE || !env.OZOW_PRIVATE_KEY || !env.UNLOCK_KEY)
+  const email = String(b.email || "").trim().slice(0, 120);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    return json(req, {error: "Type your email address. Paystack sends the receipt there."}, 400);
+  if (!env.PAYSTACK_SECRET_KEY || !env.UNLOCK_KEY)
     return json(req, {error: "Buying is not open yet. Please try again later."}, 503);
   await schema(env);
-  const amount = PRICES[plan][term].toFixed(2);
+  const price = PRICES[plan][term];
+  const amount = price.toFixed(2);
   const ref = "NST" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
-  const email = String(b.email || "").slice(0, 120);
   await env.DB.prepare("INSERT INTO shop_orders (ref, ids, plan, term, amount, status, created, email) VALUES (?,?,?,?,?,?,?,?)")
     .bind(ref, ids.map(groups).join(","), plan, term, amount, "sent", Date.now(), email).run();
-  const self = new URL(req.url).origin;
   const back = `${SITE}/#app/nestify/get?ref=${ref}`;
-  const f = {
-    SiteCode: env.OZOW_SITE_CODE, CountryCode: "ZA", CurrencyCode: "ZAR", Amount: amount,
-    TransactionReference: ref, BankReference: `Nestify ${NAMES[plan]}`.slice(0, 20),
-    Optional1: plan, Optional2: term, Optional3: ids.map(groups).join(" "),
-    CancelUrl: back + "&r=cancel", ErrorUrl: back + "&r=error", SuccessUrl: back, NotifyUrl: `${self}/ozow/notify`,
-    IsTest: String(env.OZOW_TEST || "true").toLowerCase() === "false" ? "false" : "true",
-  };
-  if (b.bank !== "other") f.SelectedBankId = CAPITEC;                     // Capitec Pay: straight to Capitec
-  let s = "";
-  for (const k of REQ_ORDER) if (f[k] !== undefined) s += f[k];
-  f.HashCheck = await sha512(s + env.OZOW_PRIVATE_KEY);
-  return json(req, {ref, action: "https://pay.ozow.com/", fields: f, amount, plan: NAMES[plan], term});
+  const r = await fetch(`${PAYSTACK}/transaction/initialize`, {method: "POST", headers: paystackHeaders(env),
+    body: JSON.stringify({email, amount: Math.round(price * 100), currency: "ZAR", reference: ref, callback_url: back,
+      metadata: {product: "Nestify", plan: NAMES[plan], term, ids: ids.map(groups).join(",")}})});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.status || !d.data || !d.data.authorization_url) {
+    await env.DB.prepare("UPDATE shop_orders SET status = 'failed' WHERE ref = ?").bind(ref).run();
+    return json(req, {error: "Could not start the payment. Please try again."}, 502);
+  }
+  return json(req, {ref, authorization_url: d.data.authorization_url, amount, plan: NAMES[plan], term});
 }
 
-async function checkWithOzow(env, ref, isTest) {
-  if (!env.OZOW_API_KEY) return null;                      // (no API key: the hash check alone)
-  const u = `https://api.ozow.com/GetTransactionByReference?siteCode=${encodeURIComponent(env.OZOW_SITE_CODE)}` +
-            `&transactionReference=${encodeURIComponent(ref)}&isTest=${isTest}`;
-  const r = await fetch(u, {headers: {ApiKey: env.OZOW_API_KEY, Accept: "application/json"}});
-  if (!r.ok) return null;
-  const list = await r.json().catch(() => []);
-  return (Array.isArray(list) ? list : [list]).some(t => String(t.status || t.Status).toLowerCase() === "complete");
+// Paystack calls this when something happens to a payment. The signature proves it came from Paystack.
+async function webhook(req, env) {
+  const raw = await req.text();
+  const want = await hmacHex512(env.PAYSTACK_SECRET_KEY || "", raw);
+  if (!sameText(want, req.headers.get("x-paystack-signature") || "")) return new Response("bad signature", {status: 400});
+  const ev = JSON.parse(raw);
+  const ref = ev && ev.data && ev.data.reference;
+  if (!ref) return new Response("ok");
+  if (ev.event === "charge.success") return await settle(env, ref);
+  if (ev.event === "charge.failed") {
+    await schema(env);
+    await env.DB.prepare("UPDATE shop_orders SET status = 'failed' WHERE ref = ? AND status != 'paid'").bind(ref).run();
+  }
+  return new Response("ok");
 }
 
-async function notify(req, env) {
-  const form = await req.formData();
-  const g = k => String(form.get(k) ?? "");
-  let s = "";
-  for (const k of RES_ORDER) s += g(k);
-  const want = (await sha512(s + env.OZOW_PRIVATE_KEY)).replace(/^0+/, "");
-  if (want !== g("Hash").toLowerCase().replace(/^0+/, "")) return new Response("bad hash", {status: 400});
+// Check the payment with Paystack itself before any code is made.
+async function settle(env, ref) {
   await schema(env);
-  const ref = g("TransactionReference");
   const o = await env.DB.prepare("SELECT * FROM shop_orders WHERE ref = ?").bind(ref).first();
   if (!o) return new Response("no such order", {status: 404});
-  const status = g("Status");
-  if (o.status === "paid") return new Response("ok");               // told twice: once is enough
-  if (status !== "Complete") {
-    await env.DB.prepare("UPDATE shop_orders SET status = ?, txn = ? WHERE ref = ?").bind(status.toLowerCase(), g("TransactionId"), ref).run();
-    return new Response("ok");
-  }
-  if (Number(g("Amount")) !== Number(o.amount)) return new Response("wrong amount", {status: 400});
-  if (g("IsTest").toLowerCase() === "true" && String(env.OZOW_TEST || "true").toLowerCase() === "false")
-    return new Response("test payment on the live shop", {status: 400});
-  const again = await checkWithOzow(env, ref, g("IsTest").toLowerCase() === "true");
-  if (again === false) return new Response("not complete at Ozow", {status: 400});
+  if (o.status === "paid") return new Response("ok");                 // told twice: once is enough
+  const r = await fetch(`${PAYSTACK}/transaction/verify/${encodeURIComponent(ref)}`, {headers: paystackHeaders(env)});
+  const d = await r.json().catch(() => ({}));
+  const t = d && d.data;
+  if (!r.ok || !d.status || !t || t.status !== "success") return new Response("not successful", {status: 400});
+  if (t.currency !== "ZAR" || Number(t.amount) !== Math.round(Number(o.amount) * 100))
+    return new Response("wrong amount", {status: 400});
   const codes = [];
   for (const id of o.ids.split(",")) {
     const cur = await env.DB.prepare("SELECT * FROM shop_licences WHERE id = ?").bind(id).first();
@@ -170,7 +170,7 @@ async function notify(req, env) {
     codes.push({id, code, last_day: isoDay(last)});
   }
   await env.DB.prepare("UPDATE shop_orders SET status = 'paid', paid = ?, codes = ?, txn = ? WHERE ref = ?")
-    .bind(Date.now(), JSON.stringify(codes), g("TransactionId"), ref).run();
+    .bind(Date.now(), JSON.stringify(codes), String(t.id || ""), ref).run();
   return new Response("ok");
 }
 
@@ -205,11 +205,11 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, {headers: cors(req)});
     try {
       if (url.pathname === "/pay" && req.method === "POST") return await pay(req, env);
-      if (url.pathname === "/ozow/notify" && req.method === "POST") return await notify(req, env);
+      if (url.pathname === "/paystack/webhook" && req.method === "POST") return await webhook(req, env);
       if (url.pathname === "/order") return await order(req, env, url);
       if (url.pathname === "/licence") return await licence(req, env, url);
       if (url.pathname === "/orders") return await orders(req, env, url);
-      if (url.pathname === "/") return json(req, {shop: "nestify", version: 1, open: !!(env.OZOW_SITE_CODE && env.UNLOCK_KEY)});
+      if (url.pathname === "/") return json(req, {shop: "nestify", version: 2, open: !!(env.PAYSTACK_SECRET_KEY && env.UNLOCK_KEY)});
     } catch (e) {
       return json(req, {error: "Something went wrong: " + e.message}, 500);
     }
